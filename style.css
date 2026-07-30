@@ -1,0 +1,337 @@
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --red: #e10600;
+  --dark: #1a1a2e;
+  --darker: #0f0f1a;
+  --gray: #2a2a3e;
+  --light: #f0f0f0;
+  --gold: #ffd700;
+  --silver: #c0c0c0;
+  --checker-size: 20px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--darker);
+  color: var(--light);
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: linear-gradient(135deg, var(--dark), var(--red));
+  padding: 12px 16px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 2px 20px rgba(225, 6, 0, 0.3);
+}
+
+header h1 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+header h1 .flag {
+  display: inline-block;
+  animation: wave-flag 1s ease-in-out infinite;
+}
+
+@keyframes wave-flag {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  75% { transform: rotate(-10deg); }
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.view {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 16px;
+  gap: 16px;
+}
+
+.view.active {
+  display: flex;
+}
+
+/* Camera View */
+#camera-frame {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 3/4;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 40px rgba(225, 6, 0, 0.2);
+  border: 2px solid var(--red);
+  cursor: pointer;
+}
+
+#camera-frame .camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--darker);
+  z-index: 1;
+}
+
+#camera-frame .camera-placeholder .cam-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+#camera-frame .camera-placeholder .cam-label {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+#camera-frame.camera-active .camera-placeholder {
+  display: none;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#viewfinder-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-color: var(--red);
+  border-style: solid;
+}
+
+.corner.top-left { top: 12px; left: 12px; border-width: 3px 0 0 3px; }
+.corner.top-right { top: 12px; right: 12px; border-width: 3px 3px 0 0; }
+.corner.bottom-left { bottom: 12px; left: 12px; border-width: 0 0 3px 3px; }
+.corner.bottom-right { bottom: 12px; right: 12px; border-width: 0 3px 3px 0; }
+
+.viewfinder-text {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,0.6);
+  text-shadow: 0 0 10px rgba(0,0,0,0.8);
+}
+
+/* Theme Selector */
+#theme-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.theme-btn {
+  background: var(--gray);
+  border: 2px solid transparent;
+  color: var(--light);
+  padding: 8px 16px;
+  border-radius: 25px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-btn span { font-size: 1.1rem; }
+
+.theme-btn.active {
+  border-color: var(--red);
+  background: rgba(225, 6, 0, 0.2);
+  box-shadow: 0 0 15px rgba(225, 6, 0, 0.3);
+}
+
+.theme-btn:active { transform: scale(0.95); }
+
+/* Capture Button */
+#capture-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid var(--light);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+}
+
+#capture-btn:active { transform: scale(0.9); }
+
+.btn-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--red);
+  transition: all 0.15s;
+}
+
+#capture-btn:active .btn-ring {
+  width: 48px;
+  height: 48px;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 1px;
+}
+
+/* Result View */
+#result-frame {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 3/4;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(225, 6, 0, 0.2);
+  border: 2px solid var(--red);
+  background: #000;
+}
+
+#result-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#watermark {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+.result-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.action-btn {
+  padding: 12px 24px;
+  border: 2px solid var(--gray);
+  background: var(--gray);
+  color: var(--light);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn.primary {
+  background: var(--red);
+  border-color: var(--red);
+  box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);
+}
+
+.action-btn:active { transform: scale(0.95); }
+
+/* Loading */
+#loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 20;
+}
+
+#loading-overlay.hidden { display: none; }
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid var(--gray);
+  border-top-color: var(--red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+footer {
+  text-align: center;
+  padding: 8px;
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.2);
+}
+
+/* Checkered flag animation for header background */
+header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(
+    var(--checker-color-1, #fff) 0% 25%,
+    var(--checker-color-2, #000) 0% 50%
+  ) 0 0 / 12px 12px;
+  opacity: 0.05;
+  pointer-events: none;
+}

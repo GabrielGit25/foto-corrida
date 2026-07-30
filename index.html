@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#e10600">
+  <meta name="description" content="Transforme sua selfie em uma foto de corrida épica!">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Foto Corrida</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1><span class="flag">🏁</span> Foto Corrida</h1>
+    </header>
+
+    <main>
+      <div id="camera-view" class="view active">
+        <div id="camera-frame">
+          <div class="camera-placeholder">
+            <span class="cam-icon">📷</span>
+            <span class="cam-label">Toque para ativar a câmera</span>
+          </div>
+          <video id="video" autoplay playsinline></video>
+          <div id="viewfinder-overlay">
+            <div class="corner top-left"></div>
+            <div class="corner top-right"></div>
+            <div class="corner bottom-left"></div>
+            <div class="corner bottom-right"></div>
+            <div class="viewfinder-text">ENQUADRE SEU ROSTO</div>
+          </div>
+        </div>
+        <div id="theme-selector">
+          <button class="theme-btn active" data-theme="classic" title="Clássico">
+            <span>🏁</span> Clássico
+          </button>
+          <button class="theme-btn" data-theme="champion" title="Campeão">
+            <span>🏆</span> Campeão
+          </button>
+          <button class="theme-btn" data-theme="pitstop" title="Box">
+            <span>🔧</span> Box
+          </button>
+        </div>
+        <button id="capture-btn">
+          <span class="btn-ring"></span>
+        </button>
+        <p class="hint">Toque na tela para iniciar a câmera</p>
+      </div>
+
+      <div id="result-view" class="view">
+        <div id="result-frame">
+          <canvas id="result-canvas"></canvas>
+          <div id="watermark">fotocorrida.app</div>
+        </div>
+        <div class="result-actions">
+          <button id="download-btn" class="action-btn primary">📥 Salvar</button>
+          <button id="share-btn" class="action-btn">📤 Compartilhar</button>
+          <button id="retake-btn" class="action-btn">🔄 Nova foto</button>
+        </div>
+      </div>
+
+      <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>Processando...</p>
+      </div>
+    </main>
+
+    <footer>
+      <p>© 2026 Foto Corrida</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
