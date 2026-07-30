@@ -53,6 +53,29 @@ header h1 .flag {
   animation: wave-flag 1s ease-in-out infinite;
 }
 
+.install-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.install-btn:hover { background: rgba(255,255,255,0.25); }
+.install-btn:active { transform: translateY(-50%) scale(0.95); }
+.install-btn.hidden { display: none; }
+
 @keyframes wave-flag {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(15deg); }

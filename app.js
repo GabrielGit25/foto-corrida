@@ -499,6 +499,30 @@
     showCamera();
   });
 
+  // ─── Instalação PWA ─────────────────────────────────────
+
+  var installPrompt = null;
+  var installBtn = document.getElementById('install-btn');
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    installPrompt = e;
+    installBtn.classList.remove('hidden');
+  });
+
+  installBtn.addEventListener('click', async function () {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    var result = await installPrompt.userChoice;
+    if (result.outcome === 'accepted') installBtn.classList.add('hidden');
+    installPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', function () {
+    installBtn.classList.add('hidden');
+    installPrompt = null;
+  });
+
   // ─── Service Worker ──────────────────────────────────────
 
   if ('serviceWorker' in navigator) {
