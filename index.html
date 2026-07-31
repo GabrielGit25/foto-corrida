@@ -3,27 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#e10600">
-  <meta name="description" content="Transforme sua selfie em uma foto de corrida épica!">
+  <meta name="theme-color" content="#082868">
+  <meta name="description" content="Participe do Librelon Em Movimento e transforme sua selfie em uma foto do evento!">
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <title>Foto Corrida</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
   <div id="app">
     <header>
-      <h1><span class="flag">🏁</span> Foto Corrida</h1>
-      <button id="install-btn" class="install-btn hidden">📲 Instalar</button>
+      <div class="brand">
+        <span class="avatar">💛</span>
+        <div class="brand-text">
+          <strong>Librelon</strong>
+          <small>Em Movimento</small>
+        </div>
+      </div>
+      <button id="install-btn" class="install-btn hidden">📲</button>
     </header>
 
     <main>
       <div id="camera-view" class="view active">
         <div id="camera-frame">
           <div class="camera-placeholder">
-            <span class="cam-icon">📷</span>
+            <svg class="hero-svg" viewBox="0 0 200 200" aria-hidden="true">
+              <rect x="18" y="68" width="164" height="112" rx="16" fill="#061f4d"></rect>
+              <rect x="48" y="46" width="104" height="30" rx="8" fill="#061f4d"></rect>
+              <rect x="66" y="40" width="68" height="14" rx="7" fill="#f8d828"></rect>
+              <circle cx="100" cy="124" r="34" fill="none" stroke="#f8d828" stroke-width="12"></circle>
+              <circle cx="100" cy="124" r="10" fill="#f8d828"></circle>
+              <circle cx="146" cy="94" r="6" fill="#f8d828"></circle>
+            </svg>
             <span class="cam-label">Toque para ativar a câmera</span>
           </div>
           <video id="video" autoplay playsinline></video>
@@ -32,35 +45,56 @@
             <div class="corner top-right"></div>
             <div class="corner bottom-left"></div>
             <div class="corner bottom-right"></div>
-            <div class="viewfinder-text">ENQUADRE SEU ROSTO</div>
           </div>
         </div>
-        <div id="theme-selector">
-          <button class="theme-btn active" data-theme="classic" title="Clássico">
-            <span>🏁</span> Clássico
-          </button>
-          <button class="theme-btn" data-theme="champion" title="Campeão">
-            <span>🏆</span> Campeão
-          </button>
-          <button class="theme-btn" data-theme="pitstop" title="Box">
-            <span>🔧</span> Box
+
+        <div class="cam-tools">
+          <button id="flip-btn" class="round-tool" title="Virar câmera" aria-label="Virar câmera">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 7h4l2-3h4l2 3h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"></path>
+              <circle cx="12" cy="13" r="3.5"></circle>
+            </svg>
           </button>
         </div>
+
+        <div id="theme-selector">
+          <button class="theme-btn active" data-theme="julho" title="Julho Amarelo">
+            <span>💛</span> Julho
+          </button>
+        </div>
+
         <button id="capture-btn">
           <span class="btn-ring"></span>
         </button>
-        <p class="hint">Toque na tela para iniciar a câmera</p>
+        <p class="hint">Toque para ativar a câmera</p>
       </div>
 
       <div id="result-view" class="view">
         <div id="result-frame">
           <canvas id="result-canvas"></canvas>
+          <div id="result-sticker-layer"></div>
           <div id="watermark">fotocorrida.app</div>
+          <button id="sticker-btn" class="round-tool" title="Figurinhas" aria-label="Figurinhas">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" fill="#ffd500" stroke="#b8860b" stroke-width="1"></circle>
+              <circle cx="8.2" cy="10" r="1.5" fill="#061f4d"></circle>
+              <circle cx="15.8" cy="10" r="1.5" fill="#061f4d"></circle>
+              <path d="M7.5 14.5c1.2 2 3 3 4.5 3s3.3-1 4.5-3" fill="none" stroke="#061f4d" stroke-width="1.6" stroke-linecap="round"></path>
+            </svg>
+          </button>
         </div>
         <div class="result-actions">
           <button id="download-btn" class="action-btn primary">📥 Salvar</button>
           <button id="share-btn" class="action-btn">📤 Compartilhar</button>
           <button id="retake-btn" class="action-btn">🔄 Nova foto</button>
+        </div>
+
+        <div id="sticker-tray">
+          <div class="sticker-tray-header">
+            <span>Figurinhas</span>
+            <button id="sticker-close" aria-label="Fechar">✕</button>
+          </div>
+          <div id="sticker-grid" class="sticker-grid"></div>
         </div>
       </div>
 
@@ -75,6 +109,6 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

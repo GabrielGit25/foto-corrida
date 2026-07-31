@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   'use strict';
 
   const video = document.getElementById('video');
@@ -10,27 +10,275 @@
   const cameraView = document.getElementById('camera-view');
   const resultView = document.getElementById('result-view');
   const loadingOverlay = document.getElementById('loading-overlay');
-  const themeBtns = document.querySelectorAll('.theme-btn');
   const cameraFrame = document.getElementById('camera-frame');
   const hintEl = document.querySelector('.hint');
+  const flipBtn = document.getElementById('flip-btn');
+  const stickerBtn = document.getElementById('sticker-btn');
+  const stickerTray = document.getElementById('sticker-tray');
+  const stickerClose = document.getElementById('sticker-close');
+  const stickerGrid = document.getElementById('sticker-grid');
+  const stickerLayer = document.getElementById('result-sticker-layer');
 
   let stream = null;
-  let currentTheme = 'classic';
   let capturedImageData = null;
   let cameraReady = false;
+  let facingMode = 'user';
   const CANVAS_W = 900;
   const CANVAS_H = 1200;
 
-  // ─── Camera ───────────────────────────────────────────────
+  // Identidade visual Librelon Em Movimento
+  const C = {
+    gold: '#f8b808',
+    goldLight: '#f8d828',
+    goldMedium: '#e88808',
+    goldDark: '#d87808',
+    navy: '#082868',
+    navyDark: '#061f4d',
+    white: '#f8f8f8',
+  };
+
+  // Adicione aqui o nome das suas figurinhas (arquivos .png em /stickers)
+  const STICKERS = [
+    'freepik.png',
+    'sticker1.png',
+    'sticker2.png',
+    'sticker3.png',
+    'sticker4.png',
+    'sticker5.png',
+    'sticker6.png',
+    'sticker7.png',
+    'sticker8.png',
+  ];
+
+  // Banner da campanha (usado no tema Julho Amarelo)
+  const heroImg = new Image();
+  heroImg.src = 'assets/hero-julho-amarelo.png';
+
+  // ─── Figurinhas ──────────────────────────────────────────
+  const stickers = [];
+  let stickerId = 0;
+
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
+  }
+
+  function loadStickerImages() {
+    return Promise.all(
+      stickers.map(function (s) {
+        if (s.img.complete && s.img.naturalWidth) return Promise.resolve();
+        return new Promise(function (resolve) {
+          s.img.addEventListener('load', resolve, { once: true });
+          s.img.addEventListener('error', resolve, { once: true });
+        });
+      })
+    );
+  }
+
+  function loadHeroImage() {
+    if (heroImg.complete && heroImg.naturalWidth) return Promise.resolve();
+    return new Promise(function (resolve) {
+      heroImg.addEventListener('load', resolve, { once: true });
+      heroImg.addEventListener('error', resolve, { once: true });
+    });
+  }
+
+  function updateStickerEl(s) {
+    const basePx = s.sizeFrac * stickerLayer.clientWidth;
+    const px = basePx * s.scale;
+    const aspect = s.aspect || 1;
+    s.el.style.left = s.x * 100 + '%';
+    s.el.style.top = s.y * 100 + '%';
+    s.el.style.width = px + 'px';
+    s.el.style.height = px * aspect + 'px';
+    s.el.style.transform =
+      'translate(-50%, -50%) rotate(' + (s.rot * 180) / Math.PI + 'deg)';
+  }
+
+  function selectSticker(s) {
+    stickers.forEach(function (st) {
+      st.el.classList.toggle('selected', st === s);
+    });
+  }
+
+  function addSticker(src) {
+    const el = document.createElement('div');
+    el.className = 'sticker-el';
+    el.innerHTML =
+      '<img src="' +
+      src +
+      '" draggable="false" alt="">' +
+      '<button class="sticker-del" aria-label="Remover figurinha">✕</button>' +
+      '<button class="sticker-handle" aria-label="Redimensionar">↗</button>';
+    const img = el.querySelector('img');
+    const s = {
+      id: 'sticker-' + stickerId++,
+      src: src,
+      x: 0.5,
+      y: 0.42,
+      scale: 1,
+      rot: 0,
+      sizeFrac: 0.24,
+      aspect: 1,
+      el: el,
+      img: img,
+    };
+    img.addEventListener('load', function () {
+      if (img.naturalHeight) s.aspect = img.naturalHeight / img.naturalWidth;
+      updateStickerEl(s);
+    });
+    stickers.push(s);
+    stickerLayer.appendChild(el);
+    selectSticker(s);
+    bindStickerEvents(s);
+    updateStickerEl(s);
+  }
+
+  function removeSticker(s) {
+    const i = stickers.indexOf(s);
+    if (i !== -1) stickers.splice(i, 1);
+    if (s.el.parentNode) s.el.parentNode.removeChild(s.el);
+  }
+
+  function clearStickers() {
+    stickers.slice().forEach(function (s) { removeSticker(s); });
+  }
+
+  function bindStickerEvents(s) {
+    const el = s.el;
+    const del = el.querySelector('.sticker-del');
+    const handle = el.querySelector('.sticker-handle');
+    const pointers = new Map();
+
+    del.addEventListener('pointerdown', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      removeSticker(s);
+    });
+
+    handle.addEventListener('pointerdown', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      selectSticker(s);
+      el.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      s.mode = 'resize';
+      const frame = stickerLayer.getBoundingClientRect();
+      const cx = frame.left + s.x * frame.width;
+      const cy = frame.top + s.y * frame.height;
+      s.startScale = s.scale;
+      s.startRot = s.rot;
+      s.startDist = Math.hypot(e.clientX - cx, e.clientY - cy);
+      s.startAng = Math.atan2(e.clientY - cy, e.clientX - cx);
+    });
+
+    el.addEventListener('pointerdown', function (e) {
+      if (e.target !== el) return;
+      e.preventDefault();
+      selectSticker(s);
+      el.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const pts = Array.from(pointers.values());
+        s.startScale = s.scale;
+        s.startRot = s.rot;
+        s.startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        s.startAng = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+      } else {
+        s.mode = 'drag';
+      }
+    });
+
+    el.addEventListener('pointermove', function (e) {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const frame = stickerLayer.getBoundingClientRect();
+
+      if (pointers.size === 1) {
+        const p = Array.from(pointers.values())[0];
+        if (s.mode === 'drag') {
+          s.x = clamp((p.x - frame.left) / frame.width, 0, 1);
+          s.y = clamp((p.y - frame.top) / frame.height, 0, 1);
+        } else if (s.mode === 'resize') {
+          const cx = frame.left + s.x * frame.width;
+          const cy = frame.top + s.y * frame.height;
+          const dist = Math.hypot(p.x - cx, p.y - cy);
+          const ang = Math.atan2(p.y - cy, p.x - cx);
+          s.scale = clamp((s.startScale * dist) / s.startDist, 0.25, 4);
+          s.rot = s.startRot + (ang - s.startAng);
+        }
+      } else {
+        const pts = Array.from(pointers.values());
+        const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const a = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+        if (s.startDist) {
+          s.scale = clamp((s.startScale * d) / s.startDist, 0.25, 4);
+          s.rot = s.startRot + (a - s.startAng);
+        }
+      }
+      updateStickerEl(s);
+    });
+
+    function release(e) {
+      if (pointers.has(e.pointerId)) pointers.delete(e.pointerId);
+      if (pointers.size === 0) s.mode = null;
+    }
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+  }
+
+  // ─── Bandeja de figurinhas ──────────────────────────────
+
+  function openTray() {
+    stickerTray.classList.add('open');
+    stickerBtn.classList.add('active');
+  }
+
+  function closeTray() {
+    stickerTray.classList.remove('open');
+    stickerBtn.classList.remove('active');
+  }
+
+  stickerBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    stickerTray.classList.contains('open') ? closeTray() : openTray();
+  });
+
+  stickerClose.addEventListener('click', closeTray);
+
+  STICKERS.forEach(function (file) {
+    const btn = document.createElement('button');
+    btn.className = 'sticker-opt';
+    btn.title = 'Adicionar figurinha';
+    const img = document.createElement('img');
+    img.src = 'stickers/' + file;
+    img.alt = 'Figurinha';
+    img.draggable = false;
+    btn.appendChild(img);
+    btn.addEventListener('click', function () {
+      addSticker(img.src);
+      closeTray();
+    });
+    stickerGrid.appendChild(btn);
+  });
+
+  // Clique fora da figurinha desmarca a seleção
+  stickerLayer.addEventListener('pointerdown', function (e) {
+    if (e.target === stickerLayer) selectSticker(null);
+  });
+
+  // ─── Camera ─────────────────────────────────────────────
 
   async function startCamera() {
     if (cameraReady) return;
     try {
+      if (!window.isSecureContext) {
+        throw new Error('Contexto inseguro: acesse via https:// ou http://localhost para usar a câmera.');
+      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('API de câmera não suportada neste navegador.');
       }
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1440 } },
+        video: { facingMode: facingMode, width: { ideal: 1080 }, height: { ideal: 1440 } },
         audio: false,
       });
       video.srcObject = stream;
@@ -41,6 +289,11 @@
       hintEl.textContent = 'Toque para capturar sua selfie';
     } catch (err) {
       console.error(err);
+      if (facingMode === 'environment') {
+        facingMode = 'user';
+        startCamera();
+        return;
+      }
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         alert('Permissão da câmera negada. Permita o acesso nos ajustes do navegador.');
       } else if (err.name === 'NotFoundError') {
@@ -61,22 +314,20 @@
     captureBtn.classList.remove('ready');
   }
 
+  flipBtn.addEventListener('click', async function (e) {
+    e.stopPropagation();
+    const hadCamera = cameraReady;
+    stopCamera();
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+    if (hadCamera) await startCamera();
+  });
+
   // ─── Iniciar câmera no primeiro toque ─────────────────────
 
   cameraFrame.addEventListener('click', startCamera, { once: false });
   captureBtn.addEventListener('click', function () {
     if (!cameraReady) { startCamera(); return; }
     capture();
-  });
-
-  // ─── Theme Selection ──────────────────────────────────────
-
-  themeBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      themeBtns.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      currentTheme = btn.dataset.theme;
-    });
   });
 
   // ─── Capture ──────────────────────────────────────────────
@@ -91,11 +342,15 @@
     tempCanvas.height = vh;
     var ctx = tempCanvas.getContext('2d');
 
-    ctx.save();
-    ctx.translate(vw, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, vw, vh);
-    ctx.restore();
+    if (facingMode === 'user') {
+      ctx.save();
+      ctx.translate(vw, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, vw, vh);
+      ctx.restore();
+    } else {
+      ctx.drawImage(video, 0, 0, vw, vh);
+    }
 
     capturedImageData = tempCanvas;
     processImage(capturedImageData);
@@ -103,338 +358,147 @@
 
   // ─── Processing ───────────────────────────────────────────
 
+  function drawBaseTo(ctx, sourceCanvas) {
+    var sw = sourceCanvas.width;
+    var sh = sourceCanvas.height;
+    var srcAspect = sw / sh;
+    var dstAspect = CANVAS_W / CANVAS_H;
+    var sx, sy, sWidth, sHeight;
+
+    if (srcAspect > dstAspect) {
+      sHeight = sh;
+      sWidth = sh * dstAspect;
+      sx = (sw - sWidth) / 2;
+      sy = 0;
+    } else {
+      sWidth = sw;
+      sHeight = sw / dstAspect;
+      sx = 0;
+      sy = (sh - sHeight) / 2;
+    }
+
+    ctx.drawImage(sourceCanvas, sx, sy, sWidth, sHeight, 0, 0, CANVAS_W, CANVAS_H);
+    applyJulhoTheme(ctx);
+  }
+
+  function drawStickersTo(ctx) {
+    stickers.forEach(function (s) {
+      if (!s.img.complete || !s.img.naturalWidth) return;
+      var w = s.sizeFrac * CANVAS_W * s.scale;
+      var h = w * (s.img.naturalHeight / s.img.naturalWidth);
+      ctx.save();
+      ctx.translate(s.x * CANVAS_W, s.y * CANVAS_H);
+      ctx.rotate(s.rot);
+      ctx.drawImage(s.img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    });
+  }
+
   function processImage(sourceCanvas) {
     loadingOverlay.classList.remove('hidden');
+    closeTray();
+    clearStickers();
 
-    setTimeout(function () {
-      canvas.width = CANVAS_W;
-      canvas.height = CANVAS_H;
-      var ctx = canvas.getContext('2d');
-
-      var sw = sourceCanvas.width;
-      var sh = sourceCanvas.height;
-      var srcAspect = sw / sh;
-      var dstAspect = CANVAS_W / CANVAS_H;
-      var sx, sy, sWidth, sHeight;
-
-      if (srcAspect > dstAspect) {
-        sHeight = sh;
-        sWidth = sh * dstAspect;
-        sx = (sw - sWidth) / 2;
-        sy = 0;
-      } else {
-        sWidth = sw;
-        sHeight = sw / dstAspect;
-        sx = 0;
-        sy = (sh - sHeight) / 2;
-      }
-
-      ctx.drawImage(sourceCanvas, sx, sy, sWidth, sHeight, 0, 0, CANVAS_W, CANVAS_H);
-
-      switch (currentTheme) {
-        case 'classic': applyClassicTheme(ctx); break;
-        case 'champion': applyChampionTheme(ctx); break;
-        case 'pitstop': applyPitStopTheme(ctx); break;
-      }
-
-      loadingOverlay.classList.add('hidden');
-      showResult();
-    }, 300);
+    loadHeroImage().then(function () {
+      setTimeout(function () {
+        canvas.width = CANVAS_W;
+        canvas.height = CANVAS_H;
+        var ctx = canvas.getContext('2d');
+        drawBaseTo(ctx, sourceCanvas);
+        loadingOverlay.classList.add('hidden');
+        showResult();
+      }, 300);
+    });
   }
 
-  // ─── Theme: Classic ───────────────────────────────────────
-
-  function applyClassicTheme(ctx) {
-    addCheckeredFlag(ctx, 0, CANVAS_H - 160, CANVAS_W, 160);
-    addFinishLine(ctx);
-    addRacingStripes(ctx);
-    addRaceNumber(ctx, Math.floor(Math.random() * 99) + 1);
-    addSpeedLines(ctx);
-    addGradientVignette(ctx);
+  function renderFinal() {
+    var finalCanvas = document.createElement('canvas');
+    finalCanvas.width = CANVAS_W;
+    finalCanvas.height = CANVAS_H;
+    var ctx = finalCanvas.getContext('2d');
+    drawBaseTo(ctx, capturedImageData);
+    return loadStickerImages().then(function () {
+      drawStickersTo(ctx);
+      return finalCanvas;
+    });
   }
 
-  function addCheckeredFlag(ctx, x, y, w, h) {
-    var size = 20;
-    for (var row = 0; row < Math.ceil(h / size); row++) {
-      for (var col = 0; col < Math.ceil(w / size); col++) {
-        ctx.fillStyle = (row + col) % 2 === 0 ? '#ffffff' : '#1a1a1a';
-        ctx.fillRect(x + col * size, y + row * size, size, size);
-      }
-    }
-    ctx.fillStyle = '#e10600';
-    ctx.fillRect(x, y + h - 8, w, 8);
+  // ─── Tema — Identidade Librelon Em Movimento ───────────
+
+  function goldGradient(ctx, x, y, w, h) {
+    var g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, C.goldLight);
+    g.addColorStop(0.5, C.gold);
+    g.addColorStop(1, C.goldDark);
+    return g;
   }
 
-  function addFinishLine(ctx) {
-    ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 72px "Impact","Arial Black",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    var text = 'FINISH LINE';
-    var tx = CANVAS_W / 2;
-    var ty = CANVAS_H - 80;
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 3;
-    ctx.fillText(text, tx, ty);
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = '#e10600';
-    ctx.lineWidth = 4;
-    ctx.strokeText(text, tx, ty);
-    ctx.restore();
-  }
-
-  function addRacingStripes(ctx) {
-    ctx.save();
-    var stripeW = 40;
-    var gap = 30;
-    for (var x = -stripeW; x < CANVAS_W + stripeW; x += stripeW + gap) {
-      ctx.fillStyle = 'rgba(225,6,0,0.35)';
-      ctx.fillRect(x, 0, stripeW, CANVAS_H * 0.5);
-    }
-    ctx.restore();
-  }
-
-  function addRaceNumber(ctx, num) {
-    ctx.save();
-    var size = 80;
-    var px = CANVAS_W - 60;
-    var py = 100;
-    var padding = 10;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = '#ffffff';
-    roundRect(ctx, px - size / 2 - padding, py - size / 2 - padding, size + padding * 2, size + padding * 2, 10);
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font = 'bold ' + size + 'px "Arial Black",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(num).padStart(2, '0'), px, py + 2);
-    ctx.fillStyle = '#e10600';
-    ctx.font = 'bold ' + (size * 0.95) + 'px "Arial Black",sans-serif';
-    ctx.fillText(String(num).padStart(2, '0'), px, py);
-    ctx.restore();
-  }
-
-  function addSpeedLines(ctx) {
-    ctx.save();
-    for (var i = 0; i < 30; i++) {
-      var x = Math.random() * CANVAS_W;
-      var y = Math.random() * CANVAS_H;
-      var len = 40 + Math.random() * 80;
-      var alpha = 0.08 + Math.random() * 0.12;
-      ctx.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
-      ctx.lineWidth = 2 + Math.random() * 3;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + len, y + len * 0.3);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  function addGradientVignette(ctx) {
-    var grad = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 2, CANVAS_H * 0.2, CANVAS_W / 2, CANVAS_H / 2, CANVAS_H * 0.8);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.4)');
-    ctx.fillStyle = grad;
+  function addNavyOverlay(ctx, alpha) {
+    ctx.fillStyle = 'rgba(6,31,77,' + (alpha || 0.35) + ')';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   }
 
-  // ─── Theme: Champion ──────────────────────────────────────
-
-  function applyChampionTheme(ctx) {
-    addGoldOverlay(ctx);
-    addTrophy(ctx);
-    addChampionText(ctx);
-    addConfetti(ctx);
-    addGradientVignette(ctx);
+  function addGoldLine(ctx, x, y, w, h) {
+    ctx.fillStyle = goldGradient(ctx, x, y, w, h);
+    ctx.fillRect(x, y, w, h);
   }
 
-  function addGoldOverlay(ctx) {
-    var grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
-    grad.addColorStop(0, 'rgba(255,215,0,0.08)');
-    grad.addColorStop(0.5, 'rgba(255,215,0,0.15)');
-    grad.addColorStop(1, 'rgba(255,215,0,0.08)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-  }
-
-  function addTrophy(ctx) {
+  function addGoldOrnaments(ctx) {
     ctx.save();
-    var cx = CANVAS_W / 2;
-    var cy = 140;
-    ctx.shadowColor = 'rgba(255,215,0,0.6)';
-    ctx.shadowBlur = 30;
-    ctx.fillStyle = '#ffd700';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 50, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#ffec80';
-    ctx.beginPath();
-    ctx.arc(cx - 8, cy - 12, 14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.arc(cx + 8, cy - 12, 14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#daa520';
-    ctx.fillRect(cx - 12, cy + 35, 24, 40);
-    ctx.fillStyle = '#b8860b';
-    ctx.fillRect(cx - 30, cy + 70, 60, 12);
-    ctx.fillRect(cx - 20, cy + 82, 40, 10);
-    ctx.restore();
-  }
-
-  function addChampionText(ctx) {
-    ctx.save();
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 64px "Impact","Arial Black",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 3;
-    ctx.fillText('CAMPEÃO', CANVAS_W / 2, CANVAS_H - 80);
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = '#b8860b';
-    ctx.lineWidth = 3;
-    ctx.strokeText('CAMPEÃO', CANVAS_W / 2, CANVAS_H - 80);
-    ctx.restore();
-  }
-
-  function addConfetti(ctx) {
-    var colors = ['#ffd700', '#e10600', '#ffffff', '#ff6b6b', '#ffd93d'];
-    for (var i = 0; i < 60; i++) {
+    for (var i = 0; i < 26; i++) {
       var x = Math.random() * CANVAS_W;
       var y = Math.random() * CANVAS_H;
-      var w = 6 + Math.random() * 10;
-      var h = 4 + Math.random() * 8;
-      var angle = Math.random() * Math.PI;
+      var s = 6 + Math.random() * 14;
+      ctx.fillStyle = goldGradient(ctx, x - s, y - s, s * 2, s * 2);
+      ctx.globalAlpha = 0.2 + Math.random() * 0.35;
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-      ctx.globalAlpha = 0.5 + Math.random() * 0.4;
-      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-s / 2, -s / 2, s, s);
       ctx.restore();
     }
+    ctx.restore();
   }
 
-  // ─── Theme: Pit Stop ──────────────────────────────────────
+  // ─── Tema: Julho Amarelo ───────────────────────────────
 
-  function applyPitStopTheme(ctx) {
-    addPitBoard(ctx);
-    addTireMarks(ctx);
-    addPitText(ctx);
-    addSpeedDial(ctx);
-    addGradientVignette(ctx);
+  function applyJulhoTheme(ctx) {
+    addNavyOverlay(ctx, 0.2);
+    addGoldOrnaments(ctx);
+    addHeroBanner(ctx);
+    addPhotoFrame(ctx);
   }
 
-  function addPitBoard(ctx) {
+  function addHeroBanner(ctx) {
+    if (!heroImg.complete || !heroImg.naturalWidth) return;
+    var h = Math.round((CANVAS_W * heroImg.naturalHeight) / heroImg.naturalWidth);
+    ctx.drawImage(heroImg, 0, CANVAS_H - h, CANVAS_W, h);
+  }
+
+  function addPhotoFrame(ctx) {
+    var b = 24;
+    ctx.fillStyle = C.navyDark;
+    ctx.fillRect(0, 0, CANVAS_W, b);
+    ctx.fillRect(0, CANVAS_H - b, CANVAS_W, b);
+    ctx.fillRect(0, 0, b, CANVAS_H);
+    ctx.fillRect(CANVAS_W - b, 0, b, CANVAS_H);
+    addGoldLine(ctx, 0, b, CANVAS_W, 5);
+    addGoldLine(ctx, 0, CANVAS_H - b - 5, CANVAS_W, 5);
+    addGoldLine(ctx, b, 0, 5, CANVAS_H);
+    addGoldLine(ctx, CANVAS_W - b - 5, 0, 5, CANVAS_H);
+    addRoundedGoldBorder(ctx);
+  }
+
+  function addRoundedGoldBorder(ctx) {
     ctx.save();
-    var bx = 40, by = 40, bw = 280, bh = 180;
-    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = 15;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = '#1a1a1a';
-    roundRect(ctx, bx, by, bw, bh, 8);
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = '#e10600';
+    roundRectPath(ctx, 1, 1, CANVAS_W - 2, CANVAS_H - 2, 32);
+    ctx.strokeStyle = goldGradient(ctx, 0, 0, CANVAS_W, CANVAS_H);
     ctx.lineWidth = 4;
-    roundRect(ctx, bx, by, bw, bh, 8);
     ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px "Courier New",monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    var lines = ['PIT STOP', '', 'T  +' + Math.floor(Math.random() * 5) + '.' + Math.floor(Math.random() * 9) + 's', 'FR: OK  RR: OK', 'RL: OK  FL: OK'];
-    lines.forEach(function (line, i) { ctx.fillText(line, bx + bw / 2, by + 28 + i * 30); });
     ctx.restore();
   }
 
-  function addTireMarks(ctx) {
-    ctx.save();
-    for (var i = 0; i < 5; i++) {
-      var startX = Math.random() * CANVAS_W * 0.5 + CANVAS_W * 0.25;
-      var startY = CANVAS_H - 200 - Math.random() * 150;
-      ctx.strokeStyle = 'rgba(30,30,30,' + (0.15 + Math.random() * 0.15) + ')';
-      ctx.lineWidth = 8 + Math.random() * 6;
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(startX + (Math.random() - 0.5) * 120, startY + 80 + Math.random() * 60);
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(30,30,30,' + (0.08 + Math.random() * 0.1) + ')';
-      ctx.lineWidth = 4 + Math.random() * 3;
-      for (var j = 0; j < 6; j++) {
-        var tx = startX + (Math.random() - 0.5) * 80;
-        var ty = startY + 20 + j * 15;
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx + (Math.random() - 0.5) * 30, ty + 10 + Math.random() * 10);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
-
-  function addPitText(ctx) {
-    ctx.save();
-    ctx.fillStyle = '#e10600';
-    ctx.font = 'bold 56px "Impact","Arial Black",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 3;
-    ctx.fillText('PIT STOP', CANVAS_W / 2, CANVAS_H - 80);
-    ctx.restore();
-  }
-
-  function addSpeedDial(ctx) {
-    ctx.save();
-    var cx = CANVAS_W - 90, cy = CANVAS_H - 120, r = 60;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = '#e10600';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI * 0.8, Math.PI * 0.3);
-    ctx.stroke();
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI * 0.3, Math.PI * 0.2);
-    ctx.stroke();
-    ctx.shadowColor = 'transparent';
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 28px "Arial Black",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('' + Math.floor(7000 + Math.random() * 4000), cx, cy + 4);
-    ctx.fillStyle = '#e10600';
-    ctx.font = 'bold 12px Arial,sans-serif';
-    ctx.fillText('RPM', cx, cy + 30);
-    ctx.restore();
-  }
-
-  // ─── Helpers ─────────────────────────────────────────────
-
-  function roundRect(ctx, x, y, w, h, r) {
+  function roundRectPath(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
@@ -463,39 +527,45 @@
   // ─── Download ─────────────────────────────────────────────
 
   downloadBtn.addEventListener('click', function () {
-    var link = document.createElement('a');
-    link.download = 'foto-corrida.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    renderFinal().then(function (finalCanvas) {
+      var link = document.createElement('a');
+      link.download = 'foto-corrida.png';
+      link.href = finalCanvas.toDataURL('image/png');
+      link.click();
+    });
   });
 
   // ─── Share ───────────────────────────────────────────────
 
-  shareBtn.addEventListener('click', async function () {
-    try {
-      var blob = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/png'); });
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Foto Corrida',
-          text: 'Transformei minha selfie em foto de corrida!',
-          files: [new File([blob], 'foto-corrida.png', { type: 'image/png' })],
-        });
-      } else {
-        var link = document.createElement('a');
-        link.download = 'foto-corrida.png';
-        link.href = URL.createObjectURL(blob);
-        link.click();
-        URL.revokeObjectURL(link.href);
+  shareBtn.addEventListener('click', function () {
+    renderFinal().then(async function (finalCanvas) {
+      try {
+        var blob = await new Promise(function (resolve) { finalCanvas.toBlob(resolve, 'image/png'); });
+        if (navigator.share) {
+          await navigator.share({
+            title: 'Foto Corrida',
+            text: 'Transformei minha selfie em foto de corrida!',
+            files: [new File([blob], 'foto-corrida.png', { type: 'image/png' })],
+          });
+        } else {
+          var link = document.createElement('a');
+          link.download = 'foto-corrida.png';
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error(err);
       }
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error(err);
-    }
+    });
   });
 
   // ─── Retake ──────────────────────────────────────────────
 
   retakeBtn.addEventListener('click', function () {
     capturedImageData = null;
+    clearStickers();
+    closeTray();
     showCamera();
   });
 

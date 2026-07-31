@@ -1,12 +1,13 @@
-const CACHE_NAME = 'foto-corrida-v2';
+const CACHE_NAME = 'foto-corrida-v16';
 const ASSETS = [
   '/',
   '/index.html',
-  '/style.css',
-  '/app.js',
+  '/style.css?v=15',
+  '/app.js?v=15',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/assets/hero-julho-amarelo.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -26,15 +27,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() =>
-        caches.match('/index.html')
-      )
-    );
-    return;
-  }
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then(function (response) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(function (cache) {
+          if (event.request.method === 'GET') cache.put(event.request, copy);
+        });
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
